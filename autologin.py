@@ -8,15 +8,18 @@ import time
 import os
 import sys
 import logging
+import traceback
+
+# 로그 파일 설정
+logging.basicConfig(
+    filename='auto_checkin.log',  # 로그 파일 이름
+    level=logging.INFO,  # 로그 레벨
+    format='%(asctime)s - %(levelname)s - %(message)s',  # 로그 포맷
+    encoding='utf-8'  # UTF-8 인코딩
+)
 
 try:
-    # 로그 파일 설정
-    logging.basicConfig(
-        filename='auto_checkin.log',  # 로그 파일 이름
-        level=logging.INFO,  # 로그 레벨
-        format='%(asctime)s - %(levelname)s - %(message)s',  # 로그 포맷
-        encoding='utf-8'  # UTF-8 인코딩
-    )
+
 
 
     # 실행 파일과 동일한 디렉토리에서 .env 파일을 찾습니다.
@@ -138,6 +141,11 @@ USER_PASSWORD=your_password
     else:
         logging.info("주말에는 출퇴근 기록을 하지 않습니다.")
 except Exception as e:
+    # 오류 발생 시 traceback 정보를 포함하여 로그에 기록
+    error_message = f"An error occurred: {str(e)}\n"
+    error_message += "Traceback:\n"
+    error_message += traceback.format_exc()
+    logging.error(error_message)        
     logging.error("실행중 에러가 발생하였습니다.:", e)    
     # 완료 후 브라우저 닫기
     
