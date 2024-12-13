@@ -2,13 +2,20 @@ import argparse
 from selenium import webdriver
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+
 from datetime import datetime
 from dotenv import load_dotenv
+
 import time
 import os
 import sys
 import logging
 import traceback
+import random
+import requests
+
 
 # 로그 파일 설정
 logging.basicConfig(
@@ -17,6 +24,18 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s',  # 로그 포맷
     encoding='utf-8'  # UTF-8 인코딩
 )
+
+
+def send_slack_message(webhook_url, message):
+    try:
+        payload = {"text": message}
+        response = requests.post(webhook_url, json=payload)
+        if response.status_code == 200:
+            logging.info("슬랙 메시지 전송 성공")
+        else:
+            logging.error(f"슬랙 메시지 전송 실패: {response.status_code}")
+    except Exception as e:
+        logging.error(f"슬랙 메시지 전송 중 오류 발생: {str(e)}")
 
 try:
 
@@ -51,6 +70,9 @@ USER_ID=your_id
 
 # 다우오피스 비밀번호
 USER_PASSWORD=your_password
+
+# Slack Webhook URL
+SLACK_WEBHOOK_URL=your_slack_webhook_url
     """
         # 파일을 생성하고 예제 내용을 쓴다
         with open(env_file_path, 'w', encoding='utf-8') as file:
@@ -68,6 +90,12 @@ USER_PASSWORD=your_password
         options.add_argument("window-size=1200,1100")
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36')
+        options.add_argument('--log-level=3')
+        options.add_experimental_option('excludeSwitches', ['enable-logging'])
+        options.add_experimental_option("useAutomationExtension", False)
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+
         driver = webdriver.Chrome(options=options)
         return driver
 
@@ -84,6 +112,7 @@ USER_PASSWORD=your_password
     home_url = os.getenv("HOME_URL")
     user_id_input = os.getenv("USER_ID")
     user_password_input = os.getenv("USER_PASSWORD")
+    slack_webhook_url = os.getenv("SLACK_WEBHOOK_URL")
     
     # 값이 하나라도 없으면 에러 발생
     if not all([home_url, user_id_input, user_password_input]):
@@ -94,21 +123,42 @@ USER_PASSWORD=your_password
     # 드라이버 초기화 및 다우오피스 로그인
     driver = get_driver()
     driver.get(home_url)
+    
+    # 페이지 로딩 대기
+    element = WebDriverWait(driver, 30).until(
+        EC.presence_of_element_located((By.ID, "username"))  # 여기에 대기할 요소의 ID를 넣습니다.
+    )    
+    
+    if element:
+        logging.info("LoginPage is fully loaded.")    
+    else:
+        logging.info("LoginPage is not fully loaded.")    
 
     # 아이디와 비밀번호 입력
     user_id = driver.find_element(By.ID, "username")
     user_password = driver.find_element(By.ID, "password")
+    time.sleep(random.uniform(1, 2))
     user_id.send_keys(user_id_input)
+    time.sleep(random.uniform(1, 2))
     user_password.send_keys(user_password_input)
+    time.sleep(random.uniform(1, 2))
     user_password.send_keys(Keys.RETURN)
 
     # 페이지 로딩 대기
-    time.sleep(5)
+    time.sleep(10)
 
     # 현재 시간 및 요일 확인
     current_hour = datetime.now().hour
     current_day = datetime.now().weekday()  # 월요일=0, 금요일=4, 주말=5, 6
-
+    
+    element = WebDriverWait(driver, 60).until(
+        EC.presence_of_element_located((By.ID, "workIn"))  # 여기에 대기할 요소의 ID를 넣습니다.
+    )    
+    
+    if element:
+        logging.info("WorkIn Page is fully loaded.")    
+    else:
+        logging.info("WorkIn Page is not fully loaded.")
     # 월~금요일 동안에만 출근/퇴근 버튼 클릭 로직 실행
     if current_day < 5:  # 주말이 아닌 경우만 실행
         if 8 <= current_hour < 12:
@@ -119,10 +169,19 @@ USER_PASSWORD=your_password
                 if "off" not in check_in_button_status:
                     check_in_button.click()
                     logging.info("출근 기록 완료")
+                    if slack_webhook_url:
+                        slack_message = f"✅ 출근 기록 완료\n"
+                        send_slack_message(slack_webhook_url, slack_message)                    
                 else:
                     logging.info("이미 출근 기록이 되어 있습니다.")
+                    if slack_webhook_url:
+                        slack_message = f"🚨 이미 출근 기록이 되어 있습니다.\n"
+                        send_slack_message(slack_webhook_url, slack_message)                    
             except Exception as e:
                 logging.error("출근 버튼을 찾을 수 없습니다:", e)
+                if slack_webhook_url:
+                    slack_message = f"🚨 출근 버튼을 찾을 수 없습니다\n"
+                    send_slack_message(slack_webhook_url, slack_message)                
 
         elif 18 <= current_hour < 24:
             # 퇴근 버튼 클릭
@@ -132,12 +191,24 @@ USER_PASSWORD=your_password
                 if "off" not in work_out_button_status:
                     work_out_button.click()
                     logging.info("퇴근 기록 완료")
+                    if slack_webhook_url:
+                        slack_message = f"✅ 퇴근 기록 완료\n"
+                        send_slack_message(slack_webhook_url, slack_message)
                 else:
                     logging.info("이미 퇴근 기록이 되어 있습니다.")
+                    if slack_webhook_url:
+                        slack_message = f"🚨 이미 퇴근 기록이 되어 있습니다.\n"
+                        send_slack_message(slack_webhook_url, slack_message)                    
             except Exception as e:
                 logging.error("퇴근 버튼을 찾을 수 없습니다:", e)
+                if slack_webhook_url:
+                    slack_message = f"🚨 퇴근 버튼을 찾을 수 없습니다\n"
+                    send_slack_message(slack_webhook_url, slack_message)                
         else:
             logging.info("현재는 출퇴근 시간이 아닙니다.")
+            if slack_webhook_url:
+                slack_message = f"🚨 현재는 출퇴근 시간이 아닙니다.\n"
+                send_slack_message(slack_webhook_url, slack_message)            
     else:
         logging.info("주말에는 출퇴근 기록을 하지 않습니다.")
 except Exception as e:
@@ -149,7 +220,13 @@ except Exception as e:
     logging.error("실행중 에러가 발생하였습니다.:", e)    
     # 완료 후 브라우저 닫기
     
+    # 슬랙으로 에러 메시지 전송
+    if slack_webhook_url:
+        slack_message = f"🚨 다우오피스 자동 출퇴근 오류 발생\n```{error_message}```"
+        send_slack_message(slack_webhook_url, slack_message)
+
 time.sleep(3)
 driver.quit()
 sys.exit("프로그램을 종료합니다.")
 sys.exit(0)
+
