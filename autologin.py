@@ -15,6 +15,7 @@ import logging
 import traceback
 import random
 import requests
+import holidays
 
 
 # 로그 파일 설정
@@ -36,6 +37,11 @@ def send_slack_message(webhook_url, message):
             logging.error(f"슬랙 메시지 전송 실패: {response.status_code}")
     except Exception as e:
         logging.error(f"슬랙 메시지 전송 중 오류 발생: {str(e)}")
+
+def is_holiday():
+    kr_holidays = holidays.KR()  # 한국 공휴일 정보
+    today = datetime.now().date()
+    return today in kr_holidays
 
 try:
 
@@ -159,6 +165,16 @@ SLACK_WEBHOOK_URL=your_slack_webhook_url
         logging.info("WorkIn Page is fully loaded.")    
     else:
         logging.info("WorkIn Page is not fully loaded.")
+
+    # 공휴일 체크
+    if is_holiday():
+        logging.info("오늘은 공휴일입니다.")
+        if slack_webhook_url:
+            slack_message = "🎉 오늘은 공휴일입니다. 출퇴근 기록을 하지 않습니다."
+            send_slack_message(slack_webhook_url, slack_message)
+        driver.quit()
+        sys.exit("프로그램을 종료합니다.")
+
     # 월~금요일 동안에만 출근/퇴근 버튼 클릭 로직 실행
     if current_day < 5:  # 주말이 아닌 경우만 실행
         if 8 <= current_hour < 12:
@@ -217,7 +233,7 @@ except Exception as e:
     error_message += "Traceback:\n"
     error_message += traceback.format_exc()
     logging.error(error_message)        
-    logging.error("실행중 에러가 발생하였습니다.:", e)    
+    logging.error("실행중 에러가 발생하였습니다.: %s", str(e))    
     # 완료 후 브라우저 닫기
     
     # 슬랙으로 에러 메시지 전송
