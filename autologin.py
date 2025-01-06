@@ -71,6 +71,9 @@ try:
 # 회사 다우오피스 홈페이지 URL
 HOME_URL="https://<subpath>.daouoffice.com/login?returnUrl=%2Fapp%2Fehr"
 
+# 다우오피스 출퇴근 기록 페이지 URL
+CHECK_IN_URL="https://<subpath>.daouoffice.com/app/ehr"
+
 # 다우오피스 사용자 ID
 USER_ID=your_id
 
@@ -119,6 +122,7 @@ SLACK_WEBHOOK_URL=your_slack_webhook_url
     user_id_input = os.getenv("USER_ID")
     user_password_input = os.getenv("USER_PASSWORD")
     slack_webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+    check_in_url = os.getenv("CHECK_IN_URL")
     
     # 값이 하나라도 없으면 에러 발생
     if not all([home_url, user_id_input, user_password_input]):
@@ -140,7 +144,7 @@ SLACK_WEBHOOK_URL=your_slack_webhook_url
     else:
         logging.info("LoginPage is not fully loaded.")    
 
-    # 아이디와 비밀번호 입력
+    # 아이디와 비밀번호 입력 및 로그인
     user_id = driver.find_element(By.ID, "username")
     user_password = driver.find_element(By.ID, "password")
     time.sleep(random.uniform(1, 2))
@@ -150,15 +154,32 @@ SLACK_WEBHOOK_URL=your_slack_webhook_url
     time.sleep(random.uniform(1, 2))
     user_password.send_keys(Keys.RETURN)
 
-    # 페이지 로딩 대기
-    time.sleep(10)
+    # 비밀번호 변경 요청 페이지 처리
+    try:
+        # 비밀번호 변경 나중에 하기 버튼 찾기 (10초 동안 시도)
+        change_later_button = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.ID, "changeLater"))
+        )
+        logging.info("비밀번호 변경 요청 페이지 발견")
+        change_later_button.click()
+        logging.info("나중에 변경하기 버튼 클릭")
+        slack_message = f"🚨 비밀번호 변경 요청 페이지 발견\n"
+        send_slack_message(slack_webhook_url, slack_message)
+        time.sleep(2)  # 페이지 전환 대기
+        driver.get(check_in_url)
+    except Exception as e:
+        # 비밀번호 변경 페이지가 없으면 그냥 진행
+        logging.info("비밀번호 변경 요청 페이지 없음")
+        driver.get(check_in_url)
+        pass
 
     # 현재 시간 및 요일 확인
     current_hour = datetime.now().hour
     current_day = datetime.now().weekday()  # 월요일=0, 금요일=4, 주말=5, 6
-    
+
+    # workIn 버튼 찾기
     element = WebDriverWait(driver, 60).until(
-        EC.presence_of_element_located((By.ID, "workIn"))  # 여기에 대기할 요소의 ID를 넣습니다.
+        EC.presence_of_element_located((By.ID, "workIn"))
     )    
     
     if element:

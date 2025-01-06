@@ -18,15 +18,15 @@ pip install pyinstaller
 pyinstaller --onefile --name <실행파일명> autologin.py
 ex : pyinstaller --onefile --clean --noupx --name autologin autologin.py
 
-## 파일 생성 명령어로 파일 생성
+## 파일 생성 명령어로 파일 생성 (default)
 pyinstaller --onefile --clean --noupx --name autologin --hidden-import holidays --hidden-import holidays.countries --hidden-import holidays.constants --hidden-import holidays.holiday_base --hidden-import holidays.utils --hidden-import holidays.countries.korea autologin.py
 
-# exe 파일로 만들지만 여러 파일이 필요한 방법 (바이러스 프로그램에 걸리지 않음.)
+<!-- # exe 파일로 만들지만 여러 파일이 필요한 방법 (바이러스 프로그램에 걸리지 않음.)
 # nuitka 설치 
 pip install -U nuitka
 
 # nuitka 로 exe 파일 생성
-python -m nuitka --mingw64 --standalone autologin.py
+python -m nuitka --mingw64 --standalone autologin.py -->
 
 # 가상 환경 종료
 .\venv\Scripts\deactivate
