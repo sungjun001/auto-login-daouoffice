@@ -198,7 +198,7 @@ SLACK_WEBHOOK_URL=your_slack_webhook_url
 
     # 월~금요일 동안에만 출근/퇴근 버튼 클릭 로직 실행
     if current_day < 5:  # 주말이 아닌 경우만 실행
-        if 8 <= current_hour < 12:
+        if 7 <= current_hour < 12:
             # 출근 버튼 클릭
             try:
                 check_in_button = driver.find_element(By.ID, "workIn")
@@ -220,7 +220,7 @@ SLACK_WEBHOOK_URL=your_slack_webhook_url
                     slack_message = f"🚨 출근 버튼을 찾을 수 없습니다\n"
                     send_slack_message(slack_webhook_url, slack_message)                
 
-        elif 18 <= current_hour < 24:
+        elif 16 <= current_hour < 24:
             # 퇴근 버튼 클릭
             try:
                 work_out_button = driver.find_element(By.ID, "workOut")
